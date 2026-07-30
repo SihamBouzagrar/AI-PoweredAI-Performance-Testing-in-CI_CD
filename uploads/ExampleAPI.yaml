@@ -1,0 +1,310 @@
+openapi: 3.0.3
+info:
+  title: 'Examples for RESTful API guide'
+  version: '1.0.0'
+externalDocs:
+  # Reference to the base document
+  description: 'ETSI ES 203 647 ...'
+  url: 'https://rest.etsi.org'
+paths:
+  # Resource path relative to server, parameters in curly braces
+  /resource/{id}:
+    # Method
+    get:
+      # Unique case-sensitive identifier
+      operationId: getResource
+      # Grouping
+      tags:
+        - Resource management
+      summary: 'Read a resource'
+      description: 'Read full contents of a resource with specific ID'
+      parameters:
+        # Parameter name used as the key in associative array of parameters
+        - name: 'id'
+          # The location of parameter: path, query, header or cookie
+          in: path
+          required: true
+          description: 'Resource ID'
+          schema:
+            # Primitive type
+            type: string
+      responses:
+        # Response code
+        200:
+          description: The requested resource
+          # Custom headers
+          headers:
+            ETag:
+              # Reference to (reusable) header definition
+              $ref: '#/components/headers/ETag'
+          # Response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceData'
+        401:
+          # Reference to (reusable) response definition
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+  /resource:
+    # POST JSON object
+    post:
+      # Info excluded
+      operationId: postResource
+      summary: Create new resource
+      parameters:
+        # Reference to (reusable) parameter definition
+        - $ref: '#/components/parameters/resourceId'
+        # Reference to (reusable) header definition
+        - $ref: '#/components/parameters/Version'
+      requestBody:
+        description: 'Data for new resource'
+        required: true
+        content:
+          # Content media type (Content-Type header value)
+          application/json:
+            schema:
+              # Reference to data type
+              $ref: '#/components/schemas/ResourceData'
+      responses:
+        204:
+          # Reference to data type
+          $ref: '#/components/responses/204'
+  '/resource/{id}/file':
+    # Upload a resource file
+    put:
+      # Info excluded
+      operationId: uploadResourceFile
+      summary: Upload a file for a resource
+      parameters:
+        - $ref: '#/components/parameters/resourceId'
+      requestBody:
+        description: 'An image file to be attached to the resource'
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                # Property name (also the name applied to content disposition)
+                file:
+                  type: string
+                  # Sets content type to application/octet-stream
+                  format: binary
+            encoding:
+              # Applies custom encoding to "file" property
+              file:
+                # Override default content type
+                contentType: image/png
+      responses:
+        204:
+          $ref: '#/components/responses/204'
+  # Example search path /search?text=rest&max=5
+  '/search':
+    get:
+      summary: 'Search resource'
+      # Description excluded
+      operationId: searchResource
+      parameters:
+        - name: 'text'
+          in: query
+          required: true
+          description: 'Text to search for'
+          schema:
+            type: string
+        - name: 'max'
+          in: query
+          # Optional parameter
+          required: false
+          description: 'Maximum number of results expected'
+          schema:
+            type: number
+        - name: 'page'
+          in: query
+          required: false
+          description: ''
+          schema:
+            type: number
+      responses:
+        200:
+          # TBD
+          description: 'The requested resource'
+          # Custom headers
+          headers:
+            ETag:
+              # Reference to (reusable) header definition
+              $ref: '#/components/headers/ETag'
+          # Response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+  '/subscription':
+    post:
+      summary: 'Subscribe to authenticated notifications'
+      # Description excluded
+      operationId: subscribeNotifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              # Subscription containing callbackUrl property
+              $ref: '#/components/schemas/Subscription'
+      responses:
+        # Subscription was created
+        201:
+          $ref: '#/components/responses/201'
+      # Out-of-band notifications from server
+      callbacks:
+        # Named callback object (inline or reference)
+        auth:
+          # Local path used by server for callback(s)
+          '{$request.body#/callbackUrl}/incoming':
+            post:
+              requestBody:
+                content:
+                  application/json:
+                      schema:
+                        $ref: '#/components/schemas/AuthenticatedNotification'
+              responses:
+                204:
+                  $ref: '#/components/responses/204'
+                401:
+                  $ref: '#/components/responses/401'
+
+  /service:
+    get:
+      # Info excluded
+      operationId: getService
+      # Support for GET request is mandatory for API provider
+      x-etsi-provision: mandatory
+      parameters:
+        - name: 'circuitswitching'
+          in: query
+          required: false
+          schema:
+            type: string
+          x-etsi-capabilities:
+            # Parameter only applies to "3G" capability
+            - 3G
+      responses:
+        200:
+          description: 'The requested service'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  speed:
+                    type: string
+                    enum:
+                      - fast
+                      - superfast
+                    x-etsi-enum:
+                      # Enum value "superfast" is optional and
+                      # only applies to "4G" and "5G" capabilities
+                      superfast:
+                        required: false
+                        x-etsi-capabilities:
+                          - 4G
+                          - 5G
+# Optional definitions
+security: []
+components:
+  schemas:
+    # Name of data type
+    SearchResults:
+      # Array type
+      type: array
+      items:
+        # Type of array members, reference to ResourceData
+        $ref: '#/components/schemas/ResourceData'
+      # No more than 10 results
+      maxItems: 10
+    ResourceData:
+      # Structured type
+      type: object
+      properties:
+        # Property name
+        id:
+          # Property type
+          type: string
+        size:
+          type: string
+          enum:
+            # Set of allowed values
+            - big
+            - bigger
+            - biggerer
+          # Default value for non-required property
+          default: big
+        created:
+          # Date-time value encoded as string
+          type: string
+          format: date-time
+      required:
+        # Set of required properties
+        - id
+    Subscription:
+      type: object
+      properties:
+        credentials:
+          $ref: '#/components/schemas/Credentials'
+    AuthenticatedNotification:
+      type: object
+    Credentials:
+      type: object
+  responses:
+    # Common responses with response code as identifier
+    201:
+      description: 'Created'
+    204:
+      description: 'No content'
+    401:
+      description: 'Unauthenticated'
+    404:
+      description: 'Not found'
+  headers:
+    Version:
+      description: 'API version'
+      required: true
+      schema:
+        type: string
+    # Definition of ETag header
+    ETag:
+      description: 'Identifier for a specific version of a resource'
+      schema:
+        type: string
+  parameters:
+    Version:
+      name: 'Version'
+      description: 'API version'
+      in: header
+      required: true
+      schema:
+        type: string
+    resourceId:
+      name: 'id'
+      in: path
+      required: true
+      description: 'Resource ID'
+      schema:
+        type: string
+  securitySchemes: {}
+  callbacks: {}
+servers:
+  # Recommended structure for API paths
+  - url: '{apiRoot}/{apiName}/{apiMajorVersion}/'
+    variables:
+      apiRoot:
+        default: https://example.com
+      apiName:
+        description: Interface name from the base document
+        default: rest-api-guide
+      apiMajorVersion:
+        description: Major version of the API from the base document
+        default: v1
+tags:
+  # Optional descriptions of tags
+  - name: Resource management
+    description: Operations for managing resources
