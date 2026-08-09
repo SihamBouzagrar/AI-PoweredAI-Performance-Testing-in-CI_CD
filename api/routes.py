@@ -141,7 +141,7 @@ async def generate_scenario(
             specification,
            
            
-            use_mock=False
+            use_mock=True
         )
 
         logger.info("URL cible : %s", base_url)
@@ -213,10 +213,7 @@ async def generate_scenario(
             detail=str(exc)
         ) from exc
 
-    finally:
-
-        if prism_started:
-            prism.stop()
+   
             
 @router.get("/status/{job_id}", response_model=JobStatusResponse)
 def get_status(job_id: str):
