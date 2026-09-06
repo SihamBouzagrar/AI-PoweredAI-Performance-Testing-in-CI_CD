@@ -1,99 +1,163 @@
-# AI Performance Testing — Generateur de scenarios JMeter par IA
+# AI Performance Testing
 
-Service FastAPI qui prend une specification OpenAPI, la fait analyser par Groq (LLM)
-pour concevoir un scenario de test de charge realiste, genere un fichier `.jmx`
-correspondant et l'execute avec Apache JMeter. Metriques temps reel visualisees
-dans Grafana via Prometheus.
+> Génération automatique de scénarios de test de charge JMeter à partir d'une spécification OpenAPI, pilotée par IA (Groq).
 
-## Architecture
+
+
+
+
+---
+
+## 1. Overview
+
+**AI Performance Testing** est un service FastAPI qui :
+1. reçoit une spécification OpenAPI,
+2. la fait analyser par un LLM (Groq) pour concevoir un scénario de test de charge réaliste,
+3. génère un fichier `.jmx` correspondant,
+4. l'exécute avec Apache JMeter.
+
+## 2. Fonctionnalités
+
+- Analyse automatique des endpoints d'une spec OpenAPI (`.yaml` / `.yml` / `.json`)
+- Conception du scénario de charge par IA (threads, ramp-up, loops, ordre des requêtes)
+- Génération d'un fichier `.jmx` prêt à l'exécution
+- Exécution asynchrone via JMeter, suivi de job par `jobId`
+- Récupération des résultats : logs, sortie standard, `.jtl`, rapport HTML
+
+## 3. Architecture
 
 ```
-Developpeur
+Développeur
       |
       v
-   Git Repository (OpenAPI spec)
+Spécification OpenAPI
       |
       v
- Jenkins Pipeline
+Serveur IA (FastAPI + Groq)
       |
-      +---------> Webhook
-      |               |
-      |               v
-      |       Serveur IA (FastAPI + Groq)
-      |               |
-      |       Generation script JMX
-      |               |
-      +---------> JMeter
-                      |
-                Execution test de charge
-                      |
-         +------------+------------+
-         |            |            |
-         v            v            v
-   Prometheus    Grafana     Archives
-   (metriques)   (dashboard) (JTL/HTML)
+      +--> Analyse de l'API
+      +--> Génération du scénario
+      +--> Génération du fichier JMX
+      |
+      v
+   JMeter
+      |
+      v
+Résultats (JTL / rapport HTML / logs)
 ```
 
-## ⚠️ Action immediate requise
+## 4. Demo
 
-L'ancien fichier `.env` contenait une cle API Groq exposee dans le depot Git.
-**Revoguez cette cle dans la console Groq et genevez-en une nouvelle** avant
-toute autre chose. Le fichier `.env` n'est plus versionne (voir `.gitignore`).
+### Envoi de la spécification OpenAPI
 
-## Installation
 
-### Option 1: Installation locale (Windows/Linux)
+### Scénario généré par l'IA
+![Generated scenario](docs/images/scenario-generation.jpeg)
 
-```bash
-# Creer l'environnement virtuel
+### Résultat de l'exécution JMeter
+![JMeter results](docs/images/jmeter-result.jpeg)
+
+> Place tes captures d'écran dans `docs/images/`. Vérifie avant publication qu'aucune clé API, token, ou IP interne n'apparaît dans une capture.
+
+## 5. Structure du projet
+
+```
+├── api/
+│   ├── __init__.py
+│   └── routes.py              # Endpoints API
+├── models/
+│   ├── __init__.py
+│   ├── request_models.py      # Modèles de requête/réponse
+│   └── scenario_model.py      # Modèle du scénario
+├── prompts/
+│   ├── __init__.py
+│   ├── scenario_prompt.py     # Prompt envoyé à l'IA
+│   └── system_prompt.py       # Prompt système
+├── services/
+│   ├── __init__.py
+│   ├── api_analyzer.py        # Analyse des endpoints API
+│   ├── file_service.py        # Gestion des fichiers
+│   ├── groq_client.py         # Client IA Groq
+│   ├── jmeter_executor.py     # Exécution JMeter asynchrone
+│   ├── jmx_generator.py       # Génération du fichier JMX
+│   ├── job_store.py           # Stockage des jobs en mémoire
+│   ├── json_cleaner.py        # Nettoyage de la réponse JSON de l'IA
+│   ├── openapi_parser.py      # Analyse des specs OpenAPI
+│   ├── prism_service.py       # Intégration Prism (mock server)
+│   ├── scenario_generator.py  # Génération du prompt
+│   └── target_resolver.py     # Résolution de la cible de test
+├── scripts/
+│   ├── setup_monitoring.bat
+│   └── start_test.bat
+├── templates/
+│   └── jmeter_template.jmx    # Template JMX de base
+├── examples/
+│   └── petstore.json
+├── app.py                     # Application FastAPI
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── .env.example
+└── .gitignore
+```
+
+> ⚠️ Si Prometheus, Grafana ou un pipeline Jenkins font partie de ton infrastructure réelle, ajoute leurs dossiers de config (`prometheus/`, `grafana/`, `Jenkinsfile`) et documente-les dans une section dédiée. Ils ne sont pas inclus ici car absents du dépôt actuel.
+
+## 6. Prérequis
+
+- Python 3.13
+- Apache JMeter 5.6.3+
+- Une clé API Groq
+- Docker 
+
+## 7. Installation
+
+### Local (Windows/Linux)
+
+```
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux/Mac
-source .venv/bin/activate
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # Linux/Mac
 
-# Installer les dependances
 pip install -r requirements.txt
 
-# Configurer les variables d'environnement
 cp .env.example .env
-# Editez .env : GROQ_API_KEY, JMETER_BIN
+# Éditez .env : GROQ_API_KEY, JMETER_BIN
 ```
 
-### Option 2: Avec Docker (recommandé - inclut Prometheus + Grafana)
+### Docker
 
-```bash
-# Copier et editer la configuration
-cp .env.example .env
-
-# Demarrer toute l'infrastructure
-scripts\setup_monitoring.bat
 ```
-
-Le script `setup_monitoring.bat` demarre automatiquement :
-- Serveur IA (FastAPI) sur http://localhost:8000
-- Prometheus sur http://localhost:9090
-- Grafana sur http://localhost:3000
-
-## Utilisation
-
-### Demarrer le serveur
-
-```bash
-# Local
-uvicorn app:app --host 0.0.0.0 --port 8000
-
-# Ou avec Docker compose
+cp .env.example .env
 docker-compose up -d
 ```
 
-### Generer et executer un test
+## 8. Configuration
 
-```bash
-# Avec le script automatique
+Variables à définir dans `.env` (voir `.env.example`) :
+
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Clé API Groq |
+| `GROQ_MODEL` | Modèle LLM utilisé |
+| `JMETER_BIN` | Chemin vers l'exécutable JMeter |
+| `PRISM_HOST` | URL du mock server Prism  |
+| `API_HOST` / `API_PORT` | Configuration du serveur FastAPI |
+
+## 9. Utilisation
+
+### Démarrer le serveur
+```
+uvicorn app:app --host 0.0.0.0 --port 8000
+# ou
+docker-compose up -d
+```
+
+### Générer et exécuter un test
+```
 scripts\start_test.bat mon_api.yaml 50 10 5
 
-# Manuellement avec curl
+# ou manuellement
 curl -X POST http://localhost:8000/generateScenario \
   -F "file=@mon_api.yaml" \
   -F "threads=50" \
@@ -101,173 +165,74 @@ curl -X POST http://localhost:8000/generateScenario \
   -F "loops=5"
 ```
 
-### Surveiller le status
-
-```bash
-# Status du job
+### Suivre le status
+```
 curl http://localhost:8000/status/JOB_ID
-
-# Logs JMeter
 curl -o jmeter.log http://localhost:8000/download/JOB_ID/log
-
-# Sortie standard JMeter
 curl -o stdout.log http://localhost:8000/download/JOB_ID/stdout
 ```
 
-## API
+## 10. API REST
 
 ### `POST /generateScenario`
 Multipart form :
-- `file` : specification OpenAPI (.yaml/.yml/.json) — **requis**
-- `threads`, `rampUp`, `loops` : overrides optionnels (sinon decides par l'IA)
+- `file` : spécification OpenAPI (.yaml/.yml/.json) — **requis**
+- `threads`, `rampUp`, `loops` : overrides optionnels
 
-Retourne immediatement (le test tourne en tache de fond) :
+Réponse immédiate (le test tourne en tâche de fond) :
 ```json
 { "jobId": "...", "status": "QUEUED", "jmxFile": "generated/scenario_xxx.jmx" }
 ```
 
 ### `GET /status/{jobId}`
 ```json
-{ "jobId": "...", "status": "RUNNING|COMPLETED|FAILED", "error": null, ... }
+{ "jobId": "...", "status": "RUNNING|COMPLETED|FAILED", "error": null }
 ```
 
 ### `GET /download/{jobId}/log`
-Log JMeter detaille pour le debogage.
+Log JMeter détaillé.
 
 ### `GET /download/{jobId}/stdout`
 Sortie standard de la commande JMeter.
 
 ### `GET /download/{jobId}/jtl`
-Fichier de resultats bruts JMeter (`.jtl`).
+Fichier de résultats bruts JMeter (`.jtl`).
 
 ### `GET /download/{jobId}/report`
-Rapport HTML JMeter, zippe.
+Rapport HTML JMeter, zippé.
 
-## Infrastructure de Monitoring
+## 11. Dépannage
 
-### Prometheus (http://localhost:9090)
-
-Metriques exposees en temps reel :
-- `jmeter_transactions_total` - Nombre de transactions par endpoint
-- `jmeter_response_duration_seconds` - Duree des reponses (avg, p50, p95, p99)
-- `jmeter_errors_total` - Erreurs par type
-- `jmeter_active_threads` - Threads actifs
-
-Regles d'alerte preconfigurees :
-- Taux d'erreur > 5% pendant 30s → CRITICAL
-- Latence P99 > 5s pendant 1min → WARNING
-- Aucun thread actif pendant 1min → WARNING
-
-### Grafana (http://localhost:3000)
-
-Dashboard JMeter preconfigure avec :
-- **TPS** : Transactions par seconde (graphique temps reel)
-- **Temps de reponse** : Moyenne, P50, P95, P99
-- **Taux d'erreur** : Pourcentage d'erreurs (jauge colorimetrique)
-- **Threads actifs** : Nombre de threads JMeter
-- **Transactions par endpoint** : Top 10 endpoints
-- **Erreurs par type** : Distribution des erreurs
-
-Identifiants par defaut : admin / admin
-
-## Pipeline Jenkins
-
-Le `Jenkinsfile` fourni automatise le processus complet :
-1. Verification de l'infrastructure (Prometheus + Grafana)
-2. Generation du scenario par IA (Groq)
-3. Execution du test JMeter avec monitoring
-4. Telechargement des artefacts (JTL, rapport HTML, logs)
-5. Publication des metriques dans Prometheus
-6. Archivage des resultats
-
-### Integration Git
-
-Le pipeline peut etre declenche automatiquement par webhook :
-- Configuration dans Jenkins : "Build Triggers" > "Poll SCM" ou "GitHub hook trigger"
-- Les webhooks GitHub pointent vers : `http://JENKINS_URL/github-webhook/`
-
-## Structure du Projet
-
+**Erreur 409 lors du téléchargement du rapport**
+Le job n'est pas encore terminé :
 ```
-├── api/
-│   ├── routes.py              # Endpoints API
-├── grafana/
-│   ├── dashboards/            # Dashboards Grafana provisionnes
-│   │   ├── dashboards.yml
-│   │   └── jmeter-dashboard.json
-│   ├── datasources/           # Datasource Prometheus
-│   │   └── datasource.yml
-├── generated/                 # Fichiers generes (JMX, resultats)
-├── models/
-│   ├── scenario_model.py      # Modele du scenario
-│   ├── request_models.py      # Modeles de requete/reponse
-├── prometheus/
-│   ├── prometheus.yml         # Configuration Prometheus
-│   ├── alert_rules.yml        # Regles d'alerte
-├── prompts/
-│   ├── scenario_prompt.py     # Prompt envoye a l'IA
-│   ├── system_prompt.py       # Prompt systeme
-├── scripts/
-│   ├── setup_monitoring.bat   # Demarrage infrastructure monitoring
-│   ├── start_test.bat         # Execution test automatisee
-├── services/
-│   ├── api_analyzer.py        # Analyse des endpoints API
-│   ├── groq_client.py         # Client IA Groq
-│   ├── jmeter_executor.py     # Execution JMeter asynchrone
-│   ├── jmx_generator.py       # Generation du fichier JMX
-│   ├── job_store.py           # Stockage des jobs en memoire
-│   ├── json_cleaner.py        # Nettoyage de la reponse JSON de l'IA
-│   ├── openapi_parser.py      # Analyse des specs OpenAPI
-│   ├── prometheus_exporter.py # Export metriques Prometheus temps reel
-│   ├── scenario_generator.py  # Generation du prompt
-├── templates/
-│   ├── jmeter_template.jmx    # Template JMX de base
-├── app.py                     # Application FastAPI
-├── docker-compose.yml         # Orchestration Docker
-├── Dockerfile                 # Image Docker du serveur IA
-├── Jenkinsfile                # Pipeline CI/CD Jenkins
-├── requirements.txt           # Dependances Python
-```
-
-## Dependances
-
-- FastAPI - Framework web
-- Uvicorn - Serveur ASGI
-- Groq - Client API Groq (LLM)
-- Pydantic - Validation de donnees
-- PyYAML - Parsing OpenAPI
-- Prometheus Client - Export de metriques
-- JMeter 5.6.3+ - Test de charge
-
-## Depannage
-
-### Erreur 409 lors du telechargement du rapport
-Le job n'est pas encore termine. Verifiez le status :
-```bash
 curl http://localhost:8000/status/JOB_ID
 ```
-Utilisez les endpoints `/download/JOB_ID/log` et `/download/JOB_ID/stdout`
-pour obtenir des informations de debogage.
 
-### JMeter ne trouve pas le chemin
-Verifiez que `JMETER_BIN` dans `.env` pointe vers le bon executable JMeter :
-```env
+**JMeter ne trouve pas le chemin**
+Vérifiez `JMETER_BIN` dans `.env` :
+```
 JMETER_BIN=C:\jmeter\apache-jmeter-5.6.3\bin\jmeter.bat
 ```
 
-### Prometheus ne scrape pas les metriques
-Verifiez que le serveur IA expose bien les metriques :
-```bash
-curl http://localhost:8000/metrics
-```
-Si le port 8000 est utilise, l'exporter Prometheus est sur le port 9090 :
-```bash
-curl http://localhost:9090/metrics
-```
+## 12. Limites connues
 
-## Limites connues
+- Le job store est en mémoire (process unique). Pour plusieurs workers/replicas, remplacez `services/job_store.py` par un backend partagé (Redis, base SQL).
+- Pas d'authentification sur l'API — à ajouter avant toute exposition hors réseau interne.
 
-- Le job store est en memoire (process unique). Pour plusieurs workers/replicas,
-  remplacez `services/job_store.py` par un backend partage (Redis, base SQL).
-- Pas d'authentification sur l'API — a ajouter avant toute exposition hors
-  reseau interne.
+## 13. Technologies
+
+- FastAPI, Uvicorn
+- Groq (LLM)
+- Pydantic, PyYAML
+- Apache JMeter 5.6.3+
+- Docker
+
+## Author
+
+[@SihamBouzagrar](https://github.com/SihamBouzagrar)
+## License
+
+Ce projet a été réalisé dans le cadre d'un stage/PFA en environnement d'entreprise. Il n'est pas destiné à une réutilisation, distribution ou modification sans autorisation préalable.
+
+All Rights Reserved 
