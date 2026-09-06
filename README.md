@@ -57,7 +57,6 @@ Résultats (JTL / rapport HTML / logs)
 ### Résultat de l'exécution JMeter
 ![JMeter results](docs/images/jmeter-result.jpeg)
 
-> Place tes captures d'écran dans `docs/images/`. Vérifie avant publication qu'aucune clé API, token, ou IP interne n'apparaît dans une capture.
 
 ## 5. Structure du projet
 
@@ -101,7 +100,6 @@ Résultats (JTL / rapport HTML / logs)
 └── .gitignore
 ```
 
-> ⚠️ Si Prometheus, Grafana ou un pipeline Jenkins font partie de ton infrastructure réelle, ajoute leurs dossiers de config (`prometheus/`, `grafana/`, `Jenkinsfile`) et documente-les dans une section dédiée. Ils ne sont pas inclus ici car absents du dépôt actuel.
 
 ## 6. Prérequis
 
