@@ -1,7 +1,7 @@
+
 name: ai-performance-platform
 
 services:
-
   ####################################################################
   # FastAPI - AI Performance Testing Platform
   ####################################################################
@@ -9,11 +9,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: ai-performance-platform
-    # init:true fait tourner un vrai process PID 1 (tini) qui gère
-    # correctement l'arrêt et le "reaping" des sous-process (Prism,
-    # JMeter). Evite les process zombies qui bloquent le port 4010
-    # et forcent des recreate/build répétés.
     init: true
     restart: unless-stopped
 
@@ -24,6 +21,7 @@ services:
     environment:
       JMETER_EXECUTABLE: /opt/jmeter/bin/jmeter
       GROQ_API_KEY: ${GROQ_API_KEY_V2}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
       PRISM_PORT: 4010
       PYTHONUNBUFFERED: "1"
 
@@ -33,13 +31,9 @@ services:
       - ./workspace:/app/workspace
       - ./logs:/app/logs
 
-    
-
     networks:
       - performance-network
 
-
-  
 ####################################################################
 # Network
 ####################################################################
